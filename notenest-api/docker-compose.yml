@@ -1,0 +1,36 @@
+services:
+  api:
+    build: .
+    container_name: backend_notenest
+    ports:
+      - "5000:5000"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=notenest
+    depends_on:
+      - mysql
+    networks:
+      - notenest_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_container_notenest
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=notenest
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - notenest_network
+
+networks:
+  notenest_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
