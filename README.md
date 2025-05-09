@@ -197,7 +197,7 @@ flutter run
 - **Backend**:
   - Flask (Python)
   - SQLAlchemy
-  - PostgreSQL
+  - MySQL
   - Docker
 
 - **Frontend**:
