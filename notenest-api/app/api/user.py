@@ -1,6 +1,6 @@
 import logging
 import traceback
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from app.config.db import db
 from app.models.user import User, UserSchema
 from app.utils.password_utils import hash_password, verify_password, generate_uuid
@@ -54,9 +54,9 @@ def register_user():
         logger.info("🆔 UUID generado: %s", user_id)
 
         hashed_password, salt = hash_password(data["password"])
-        logger.info("🔐 Hash generado: %s", hashed_password)
-        logger.info("🧂 Salt generado: %s", salt)
+        logger.info("🔐 Hash generado y 🧂 Salt generado correctamente")
 
+        # Crear usuario SQL
         new_user = User(
             id=user_id,
             email=data["email"],
@@ -65,22 +65,42 @@ def register_user():
             salt=salt,
             created_at=datetime.utcnow()
         )
-
-        logger.info("📦 Usuario preparado para insertar: %s", new_user.to_dict())
+        logger.info("📦 Usuario preparado para insertar en MySQL: %s", new_user.to_dict())
 
         db.session.add(new_user)
         db.session.commit()
-        logger.info("✅ Usuario insertado correctamente")
+        logger.info("✅ Usuario insertado correctamente en MySQL")
+
+        # Insertar también en MongoDB
+        try:
+            mongo = current_app.config['MONGO_DB']
+            mongo_user = {
+                "_id": user_id,  # UUID como clave primaria en Mongo
+                "id": user_id,
+                "email": data["email"],
+                "name": data["name"],
+                "passwordHash": hashed_password.decode(),
+                "salt": salt.decode(),
+                "token": None,
+                "createdAt": datetime.utcnow().isoformat(),
+                "updatedAt": datetime.utcnow().isoformat(),
+                "from_flask": True
+            }
+            mongo.users.insert_one(mongo_user)
+            logger.info("✅ Usuario insertado correctamente en MongoDB")
+        except Exception as mongo_error:
+            logger.error("❌ Error al insertar en MongoDB: %s", str(mongo_error))
+            logger.debug(traceback.format_exc())
 
         return jsonify({
             "message": "Usuario registrado correctamente",
             "id": new_user.id,
-            "salt": salt.decode(),  # ⬅️ devuelto como string
-            "passwordHash": hashed_password.decode()  # ⬅️ opcional si lo usas en frontend
+            "salt": salt.decode(),
+            "passwordHash": hashed_password.decode()
         }), 201
 
     except Exception as e:
-        logger.error("❌ Error en register_user: %s", str(e))
+        logger.error("❌ Error general en register_user: %s", str(e))
         logger.debug(traceback.format_exc())
         db.session.rollback()
         return jsonify({"error": "Error interno del servidor"}), 500
@@ -151,6 +171,20 @@ def update_user(user_id):
             hashed_password, salt = hash_password(data["password"])
             user.password_hash = hashed_password
             user.salt = salt
+
+        # Actualizar en MongoDB
+        mongo = current_app.config['MONGO_DB']
+        mongo.users.update_one(
+            {"_id": user_id},
+            {"$set": {
+                "email": user.email,
+                "name": user.name,
+                "passwordHash": user.password_hash.decode(),
+                "salt": user.salt.decode(),
+                "updatedAt": datetime.utcnow().isoformat()
+            }}
+        )
+        logger.info("✅ Usuario actualizado correctamente en MongoDB")
 
         db.session.commit()
         return jsonify({"message": "Usuario actualizado correctamente"}), 200

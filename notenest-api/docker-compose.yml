@@ -10,8 +10,12 @@ services:
       - DB_USER=root
       - DB_PASSWORD=root
       - DB_NAME=notenest
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DB=notenest_mongo
     depends_on:
       - mysql
+      - mongodb
     networks:
       - notenest_network
 
@@ -28,9 +32,22 @@ services:
     networks:
       - notenest_network
 
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb_notenest
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=notenest_mongo
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - notenest_network
+
 networks:
   notenest_network:
     driver: bridge
 
 volumes:
   mysql_data:
+  mongo_data:

@@ -25,16 +25,21 @@ class User(db.Model):
         self.created_at = created_at or datetime.utcnow()
         self.updated_at = updated_at or datetime.utcnow()
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_sensitive=False):
+        base = {
             'id': self.id,
             'email': self.email,
             'name': self.name,
-            'passwordHash': self.password_hash,
             'token': self.token,
-            'createdAt': self.created_at,
-            'updatedAt': self.updated_at
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
         }
+
+        if include_sensitive:
+            base['passwordHash'] = self.password_hash.decode() if self.password_hash else None
+            base['salt'] = self.salt.decode() if self.salt else None
+
+        return base
 
     @staticmethod
     def from_dict(data):
@@ -42,15 +47,19 @@ class User(db.Model):
             id=data.get('id'),
             email=data['email'],
             name=data['name'],
-            password_hash=data['passwordHash'],
-            salt=data['salt'],
+            password_hash=data.get('passwordHash').encode() if isinstance(data.get('passwordHash'), str) else data.get('passwordHash'),
+            salt=data.get('salt').encode() if isinstance(data.get('salt'), str) else data.get('salt'),
             token=data.get('token')
         )
+
 
 class UserSchema(Schema):
     id = fields.Str()
     email = fields.Str()
     name = fields.Str()
     token = fields.Str()
-    created_at = fields.DateTime()
-    updated_at = fields.DateTime()
+    createdAt = fields.DateTime(attribute='created_at')  # mapeo de snake_case a camelCase
+    updatedAt = fields.DateTime(attribute='updated_at')
+    # Optional fields for debug or internal API
+    passwordHash = fields.Str(attribute='password_hash', dump_only=True)
+    salt = fields.Str(attribute='salt', dump_only=True)

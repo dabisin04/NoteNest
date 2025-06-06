@@ -13,36 +13,40 @@ class Session(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def __init__(self, id=None, user_id=None, token=None, expires_at=None):
+    def __init__(self, id=None, user_id=None, token=None, expires_at=None, created_at=None, updated_at=None):
         self.id = id or str(uuid.uuid4())
         self.user_id = user_id
         self.token = token
         self.expires_at = expires_at
+        self.created_at = created_at or datetime.utcnow()
+        self.updated_at = updated_at or datetime.utcnow()
 
-    def to_dict(self):
-        return {
+    def to_dict(self, camel_case=True):
+        result = {
             'id': self.id,
-            'userId': self.user_id,
+            'userId': self.user_id if camel_case else self.user_id,
             'token': self.token,
-            'expiresAt': self.expires_at,
-            'createdAt': self.created_at,
-            'updatedAt': self.updated_at
+            'expiresAt': self.expires_at.isoformat() if self.expires_at else None,
+            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
         }
+        return result
 
     @staticmethod
     def from_dict(data):
         return Session(
             id=data.get('id'),
-            user_id=data['userId'],
-            token=data['token'],
-            expires_at=data['expiresAt']
+            user_id=data.get('userId') or data.get('user_id'),
+            token=data.get('token'),
+            expires_at=data.get('expiresAt') or data.get('expires_at'),
+            created_at=data.get('createdAt') or data.get('created_at'),
+            updated_at=data.get('updatedAt') or data.get('updated_at')
         )
 
 class SessionSchema(Schema):
     id = fields.Str()
-    user_id = fields.Str()
+    userId = fields.Str(attribute='user_id')
     token = fields.Str()
-    expires_at = fields.DateTime()
-    created_at = fields.DateTime()
-    updated_at = fields.DateTime()
-
+    expiresAt = fields.DateTime(attribute='expires_at')
+    createdAt = fields.DateTime(attribute='created_at')
+    updatedAt = fields.DateTime(attribute='updated_at')

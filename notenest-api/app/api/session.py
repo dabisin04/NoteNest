@@ -1,5 +1,5 @@
 import traceback
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from app.config.db import db
 from app.models.session import Session, SessionSchema
 from datetime import datetime, timedelta
@@ -35,23 +35,32 @@ def create_session():
         if not data.get("userId"):
             return jsonify({"error": "userId es requerido"}), 400
 
-        # Verificar si ya existe una sesión para este usuario
-        existing_session = Session.query.get(data["userId"])
+        # Eliminar sesión existente (MySQL)
+        existing_session = Session.query.filter_by(user_id=data["userId"]).first()
         if existing_session:
             db.session.delete(existing_session)
 
-        # Crear nueva sesión
-        duration = timedelta(days=7)  # Duración por defecto
+        # Duración de la sesión (default: 7 días)
+        duration = timedelta(days=7)
         if "duration" in data:
             duration = timedelta(days=data["duration"])
 
+        # Crear nueva sesión
         new_session = Session(
             user_id=data["userId"],
             token=str(uuid.uuid4()),
             expires_at=datetime.utcnow() + duration
         )
+
+        # Guardar en MySQL
         db.session.add(new_session)
         db.session.commit()
+        print("✅ Sesión guardada en MySQL")
+
+        # Guardar en MongoDB
+        mongo = current_app.config['MONGO_DB']
+        mongo.sessions.insert_one(new_session.to_dict())
+        print("✅ Sesión guardada en MongoDB")
 
         return jsonify({
             "message": "Sesión creada correctamente",

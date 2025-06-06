@@ -12,9 +12,9 @@ class Comment(db.Model):
     note_id      = db.Column(db.String(36), db.ForeignKey("notes.id"), nullable=False)
     parent_id    = db.Column(db.String(36), db.ForeignKey("comments.id"))
     root_comment = db.Column(db.String(36), nullable=False)
-    content      = db.Column(db.Text,      nullable=False)
-    created_at   = db.Column(db.DateTime,  default=datetime.utcnow)
-    updated_at   = db.Column(db.DateTime,  default=datetime.utcnow, onupdate=datetime.utcnow)
+    content      = db.Column(db.Text, nullable=False)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at   = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship("User", backref="comments", lazy="joined")
 
@@ -41,12 +41,12 @@ class Comment(db.Model):
         self.created_at   = created_at or now
         self.updated_at   = updated_at or now
 
-
     def _dt(self, value):
         return value.isoformat() if value else None
 
     def to_dict(self):
         return {
+            "_id":         self.id,  # MongoDB compatibility
             "id":          self.id,
             "userId":      self.user_id,
             "userName":    self.user_name,
@@ -63,7 +63,7 @@ class Comment(db.Model):
         created = data.get("createdAt")
         updated = data.get("updatedAt")
         return Comment(
-            id           = data.get("id"),
+            id           = data.get("id") or data.get("_id"),
             user_id      = data["userId"],
             user_name    = data.get("userName"),
             note_id      = data["noteId"],
@@ -73,3 +73,14 @@ class Comment(db.Model):
             created_at   = datetime.fromisoformat(created) if created else None,
             updated_at   = datetime.fromisoformat(updated) if updated else None,
         )
+
+class CommentSchema(Schema):
+    id = fields.Str()
+    userId = fields.Str(attribute="user_id")
+    userName = fields.Str(attribute="user_name")
+    noteId = fields.Str(attribute="note_id")
+    parentId = fields.Str(attribute="parent_id", allow_none=True)
+    rootComment = fields.Str(attribute="root_comment")
+    content = fields.Str()
+    createdAt = fields.DateTime(attribute="created_at")
+    updatedAt = fields.DateTime(attribute="updated_at")

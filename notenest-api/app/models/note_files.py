@@ -19,6 +19,7 @@ class NoteFile(db.Model):
 
     def to_dict(self):
         return {
+            '_id': self.id,  # Para MongoDB
             'id': self.id,
             'noteId': self.note_id,
             'fileUrl': self.file_url
@@ -27,7 +28,11 @@ class NoteFile(db.Model):
     @staticmethod
     def from_dict(data):
         return NoteFile(
-            id=data.get('id'),
+            id=data.get('id') or data.get('_id'),
             note_id=data['noteId'],
             file_url=data['fileUrl']
         )
+class NoteFileSchema(Schema):
+    id = fields.Str()
+    noteId = fields.Str(attribute='note_id')
+    fileUrl = fields.Str(attribute='file_url')
