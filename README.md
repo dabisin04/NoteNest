@@ -1,226 +1,205 @@
 # NoteNest 📝
 
-NoteNest es una aplicación de notas colaborativa que permite a los usuarios crear, compartir y gestionar notas con soporte para archivos adjuntos.
+NoteNest es una aplicación de notas con sincronización offline que permite a los usuarios crear, compartir y gestionar notas con archivos adjuntos. La aplicación utiliza una arquitectura híbrida con almacenamiento local y sincronización en la nube, permitiendo su uso sin conexión.
 
-## Estructura del Proyecto
+## Arquitectura
 
-```
-notenest/
-├── notenest-api/           # Backend (Flask)
-│   ├── app/
-│   │   ├── api/           # Endpoints de la API
-│   │   ├── models/        # Modelos de datos
-│   │   └── config/        # Configuración
-│   └── docker-compose.yml # Configuración de Docker
-│
-└── notenest/              # Frontend (Flutter)
-    ├── lib/
-    │   ├── application/   # Lógica de negocio (BLoC)
-    │   ├── domain/        # Entidades y repositorios
-    │   ├── infrastructure/# Implementaciones
-    │   └── presentation/  # UI
-    └── pubspec.yaml       # Dependencias
-```
+### Backend (Flask + MySQL + MongoDB)
+El backend utiliza una arquitectura híbrida con dos bases de datos:
+- **MySQL**: Almacenamiento principal para datos estructurados (notas, usuarios, comentarios)
+- **MongoDB**: Caché y sincronización rápida de datos, especialmente para archivos y estados
 
-## Características Principales
+La sincronización entre bases de datos se maneja automáticamente en cada operación.
 
-- 📝 Creación y edición de notas
-- 📎 Soporte para archivos adjuntos
-- 👥 Notas públicas y privadas
-- 💬 Sistema de comentarios
-- ❤️ Sistema de likes
-- 🔍 Búsqueda de notas
-- 📱 Sincronización offline
+### Frontend (Flutter)
+Utiliza Clean Architecture con tres capas principales:
+- **Presentation**: UI y widgets (Material Design)
+- **Domain**: Lógica de negocio y entidades
+- **Infrastructure**: Implementaciones y adaptadores
+
+## Bases de Datos
+
+### MySQL (Principal)
+Tablas principales:
+- `users`: Información de usuarios
+- `notes`: Notas y su contenido
+- `comments`: Sistema de comentarios
+- `note_files`: Metadatos de archivos
+- `sessions`: Gestión de sesiones
+
+### MongoDB (Sincronización)
+Colecciones:
+- `notes`: Caché de notas
+- `users`: Datos de usuario
+- `comments`: Comentarios
+- `note_files`: Referencias a archivos
+- `sessions`: Sesiones activas
+
+### SQLite (Local en Flutter)
+Almacenamiento local para:
+- Notas offline
+- Caché de archivos
+- Datos de usuario
+- Estado de sincronización
 
 ## API Endpoints
 
 ### Autenticación
-
-#### Login
 ```http
 POST /api/login
-Content-Type: application/json
-
-{
-    "email": "usuario@ejemplo.com",
-    "password": "contraseña123"
-}
-```
-
-#### Registro
-```http
 POST /api/register
-Content-Type: application/json
-
-{
-    "name": "Usuario Ejemplo",
-    "email": "usuario@ejemplo.com",
-    "password": "contraseña123"
-}
+POST /api/createSession
+DELETE /api/deleteSession/{userId}
+POST /api/validateSession
 ```
 
 ### Notas
-
-#### Obtener todas las notas
 ```http
-GET /api/notes
-```
-
-#### Obtener notas públicas
-```http
-GET /api/publicNotes
-```
-
-#### Obtener notas por usuario
-```http
-GET /api/notesByUser/{userId}
-```
-
-#### Crear nota
-```http
-POST /api/addNote
-Content-Type: application/json
-
-{
-    "title": "Mi Nota",
-    "content": "Contenido de la nota",
-    "isPublic": false,
-    "userId": "user-id",
-    "files": [
-        {
-            "fileUrl": "nombre_archivo.jpg"
-        }
-    ]
-}
-```
-
-#### Actualizar nota
-```http
-PUT /api/updateNote/{noteId}
-Content-Type: application/json
-
-{
-    "title": "Título Actualizado",
-    "content": "Contenido actualizado",
-    "isPublic": true
-}
-```
-
-#### Eliminar nota
-```http
-DELETE /api/deleteNote/{noteId}
+GET /api/notes                    # Todas las notas
+GET /api/publicNotes             # Notas públicas
+GET /api/notesByUser/{userId}    # Notas por usuario
+POST /api/addNote                # Nueva nota
+PUT /api/updateNote/{noteId}     # Actualizar nota
+DELETE /api/deleteNote/{noteId}  # Eliminar nota
+PUT /api/likeNote/{noteId}       # Dar like
+PUT /api/unlikeNote/{noteId}     # Quitar like
+POST /api/sync                   # Sincronización
 ```
 
 ### Archivos
-
-#### Obtener archivos de una nota
 ```http
-GET /api/noteFiles/{noteId}
-```
-
-#### Agregar archivo a nota
-```http
-POST /api/addNoteFile
-Content-Type: application/json
-
-{
-    "noteId": "note-id",
-    "fileUrl": "nombre_archivo.jpg"
-}
-```
-
-#### Eliminar archivo
-```http
-DELETE /api/deleteNoteFile/{fileId}
+GET /api/noteFiles/{noteId}          # Obtener archivos
+POST /api/addNoteFile               # Agregar archivo
+DELETE /api/deleteNoteFile/{fileId}  # Eliminar archivo
 ```
 
 ### Comentarios
-
-#### Obtener comentarios de una nota
 ```http
-GET /api/comments/{noteId}
+GET /api/commentsByNote/{noteId}    # Comentarios de nota
+POST /api/addComment               # Nuevo comentario
+POST /api/replyComment            # Responder comentario
+PUT /api/updateComment/{commentId} # Actualizar comentario
+DELETE /api/deleteComment/{commentId} # Eliminar comentario
 ```
 
-#### Agregar comentario
-```http
-POST /api/addComment
-Content-Type: application/json
+## Gestión de Archivos
 
-{
-    "noteId": "note-id",
-    "userId": "user-id",
-    "content": "Contenido del comentario",
-    "parentId": null
-}
+### Almacenamiento
+- Los archivos se almacenan localmente en el directorio de la aplicación
+- Se comprimen automáticamente las imágenes antes de guardar
+- Soporte para múltiples tipos de archivo
+- Vista previa para imágenes y documentos comunes
+
+### Sincronización
+- Los archivos se sincronizan bajo demanda
+- Se mantiene un registro de archivos pendientes de sincronización
+- Verificación de integridad mediante hashes
+
+## Dependencias Principales
+
+### Backend (requirements.txt)
+```
+flask
+flask-sqlalchemy
+flask-marshmallow
+pymysql
+pymongo
+python-dotenv
 ```
 
-#### Eliminar comentario
-```http
-DELETE /api/deleteComment/{commentId}
+### Frontend (pubspec.yaml)
+```yaml
+dependencies:
+  flutter_bloc: ^8.0.0
+  sqflite: ^2.0.0
+  path_provider: ^2.0.0
+  http: ^0.13.0
+  image_picker: ^0.8.0
+  file_picker: ^5.0.0
+  shared_preferences: ^2.0.0
+  flutter_image_compress: ^1.0.0
+  open_file: ^3.0.0
+  mime: ^1.0.0
 ```
 
-## Ejecutar el Proyecto
+## Características de Sincronización
 
-### Backend (API)
+- **Offline First**: Funciona sin conexión
+- **Sincronización Bidireccional**: Cliente ↔ Servidor
+- **Resolución de Conflictos**: Basada en timestamps
+- **Cola de Sincronización**: Para operaciones pendientes
+- **Estado de Conexión**: Monitoreo automático
 
-1. Navegar al directorio de la API:
-```bash
-cd notenest-api
+## Seguridad
+
+- Autenticación basada en tokens
+- Almacenamiento seguro de credenciales
+- Encriptación de datos sensibles
+- Validación de sesiones
+
+## Configuración del Proyecto
+
+### Backend
+1. Configurar variables de entorno:
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=root
+DB_NAME=notenest
+MONGO_HOST=localhost
+MONGO_PORT=27017
+MONGO_DB=notenest_mongo
 ```
 
-2. Iniciar con Docker:
+2. Iniciar servicios:
 ```bash
 docker-compose up --build
 ```
 
-La API estará disponible en `http://localhost:5000`
-
-### Frontend (Flutter)
-
-1. Navegar al directorio de la aplicación:
-```bash
-cd notenest
-```
-
+### Frontend
+1. Configurar endpoint de API en `lib/core/constants/api_constants.dart`
 2. Instalar dependencias:
 ```bash
 flutter pub get
 ```
 
-3. Ejecutar la aplicación:
+3. Ejecutar:
 ```bash
 flutter run
 ```
 
-## Tecnologías Utilizadas
+## Desarrollo
 
-- **Backend**:
-  - Flask (Python)
-  - SQLAlchemy
-  - MySQL
-  - Docker
-
-- **Frontend**:
-  - Flutter
-  - BLoC Pattern
-  - SQLite (almacenamiento local)
-  - Provider
-
-## Notas Adicionales
-
-- La API utiliza autenticación basada en tokens
-- Los archivos se almacenan localmente en el dispositivo
-- La sincronización se realiza automáticamente cuando hay conexión
-- Las notas privadas solo son visibles para su autor
+### Estructura de Directorios
+```
+notenest/
+├── lib/
+│   ├── application/
+│   │   ├── bloc/         # Estado y lógica
+│   │   └── services/     # Servicios
+│   ├── core/
+│   │   ├── constants/    # Configuración
+│   │   └── utils/        # Utilidades
+│   ├── domain/
+│   │   ├── entities/     # Modelos
+│   │   └── repositories/ # Interfaces
+│   ├── infrastructure/
+│   │   ├── adapters/     # Implementaciones
+│   │   └── datasources/  # Fuentes de datos
+│   └── presentation/
+│       ├── screens/      # Pantallas
+│       └── widgets/      # Componentes
+```
 
 ## Contribuir
 
 1. Fork el proyecto
-2. Crea tu rama de características (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
+2. Crear rama de feature (`git checkout -b feature/NuevaCaracteristica`)
+3. Commit cambios (`git commit -m 'Añadir nueva característica'`)
+4. Push a la rama (`git push origin feature/NuevaCaracteristica`)
+5. Crear Pull Request
 
 ## Licencia
 
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE.md](LICENSE.md) para más detalles. 
+Distribuido bajo la Licencia MIT. Ver `LICENSE` para más información. 
