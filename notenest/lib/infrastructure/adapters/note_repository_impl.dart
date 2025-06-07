@@ -14,14 +14,24 @@ import 'package:temp/domain/entities/user.dart';
 import 'package:temp/domain/repositories/auth_repository.dart';
 import 'package:temp/domain/repositories/note_repository.dart';
 
+/// Implementación del repositorio de notas que maneja la persistencia y sincronización
+/// de notas entre el almacenamiento local (SQLite) y el servidor remoto.
+///
+/// Esta clase implementa la interfaz NoteRepository y proporciona funcionalidad para:
+/// - Crear, leer, actualizar y eliminar notas
+/// - Gestionar archivos adjuntos a las notas
+/// - Sincronizar datos entre el almacenamiento local y el servidor
+/// - Manejar operaciones offline y online
 class NoteRepositoryImpl implements NoteRepository {
   final AuthRepository authRepository;
 
   NoteRepositoryImpl({required this.authRepository});
 
+  /// Obtiene la instancia de la base de datos SQLite
   Future<Database> get _db async => await SQLiteService.instance;
 
-  /// Verifica si hay conexión a internet.
+  /// Verifica si hay conexión a internet intentando resolver google.com
+  /// Retorna true si hay conexión, false en caso contrario
   Future<bool> _isOnline() async {
     try {
       final result = await InternetAddress.lookup('google.com')
@@ -32,11 +42,16 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Normaliza el endpoint de la API eliminando el slash inicial si existe
   String _sanitize(String endpoint) {
     return endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
   }
 
-  /// Intenta enviar una solicitud POST a la API.
+  /// Intenta realizar una petición POST a la API
+  ///
+  /// [endpoint] - Ruta del endpoint a llamar
+  /// [data] - Datos a enviar en el cuerpo de la petición
+  /// Retorna la respuesta HTTP si fue exitosa, null en caso contrario
   Future<http.Response?> _tryPostToApi(
       String endpoint, Map<String, dynamic> data) async {
     try {
@@ -62,6 +77,10 @@ class NoteRepositoryImpl implements NoteRepository {
     return null;
   }
 
+  /// Intenta realizar una petición GET a la API
+  ///
+  /// [endpoint] - Ruta del endpoint a llamar
+  /// Retorna la respuesta HTTP si fue exitosa, null en caso contrario
   Future<http.Response?> _tryGetFromApi(String endpoint) async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}${_sanitize(endpoint)}');
@@ -80,6 +99,11 @@ class NoteRepositoryImpl implements NoteRepository {
     return null;
   }
 
+  /// Intenta realizar una petición PUT a la API
+  ///
+  /// [endpoint] - Ruta del endpoint a llamar
+  /// [data] - Datos a enviar en el cuerpo de la petición
+  /// Retorna la respuesta HTTP si fue exitosa, null en caso contrario
   Future<http.Response?> _tryPutToApi(
       String endpoint, Map<String, dynamic> data) async {
     try {
@@ -101,6 +125,9 @@ class NoteRepositoryImpl implements NoteRepository {
     return null;
   }
 
+  /// Intenta realizar una petición DELETE a la API
+  ///
+  /// [endpoint] - Ruta del endpoint a llamar
   Future<void> _tryDeleteFromApi(String endpoint) async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}${_sanitize(endpoint)}');
@@ -117,6 +144,10 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Obtiene los archivos adjuntos de una nota específica
+  ///
+  /// [noteId] - ID de la nota cuyos archivos se quieren obtener
+  /// Retorna una lista de mapas con la información de los archivos
   @override
   Future<List<Map<String, dynamic>>> getNoteFiles(String noteId) async {
     print('📎 [NoteRepository] Obteniendo archivos para nota: $noteId');
@@ -174,6 +205,9 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Elimina un archivo adjunto de una nota
+  ///
+  /// [fileId] - ID del archivo a eliminar
   @override
   Future<void> deleteNoteFile(String fileId) async {
     final db = await _db;
@@ -189,6 +223,10 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Comprime un archivo si es una imagen
+  ///
+  /// [file] - Archivo a comprimir
+  /// Retorna el archivo comprimido si es una imagen, el original si no lo es
   Future<File?> compressFile(File file) async {
     final ext = file.path.split('.').last.toLowerCase();
 
@@ -213,6 +251,10 @@ class NoteRepositoryImpl implements NoteRepository {
     return file; // no se comprime si no es imagen
   }
 
+  /// Sube una nueva nota con sus archivos adjuntos
+  ///
+  /// [note] - Nota a subir
+  /// [files] - Lista de archivos adjuntos
   @override
   Future<void> uploadNote(Note note, List<File> files) async {
     final db = await _db;
@@ -243,7 +285,7 @@ class NoteRepositoryImpl implements NoteRepository {
       final noteFile = {
         'id': fileId,
         'noteId': note.id,
-        'fileUrl': filename, // Solo guardamos el nombre del archivo
+        'fileUrl': filename, // 
       };
 
       filesToUpload.add(noteFile);
@@ -264,11 +306,15 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Alias para uploadNote que mantiene compatibilidad con la interfaz
   @override
   Future<void> uploadNoteWithFiles(Note note, List<File> files) async {
     await uploadNote(note, files);
   }
 
+  /// Actualiza una nota existente
+  ///
+  /// [updatedNote] - Nota con los datos actualizados
   @override
   Future<void> updateNote(Note updatedNote) async {
     final db = await _db;
@@ -285,6 +331,10 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Actualiza una nota y agrega nuevos archivos adjuntos
+  ///
+  /// [updatedNote] - Nota con los datos actualizados
+  /// [newFiles] - Lista de nuevos archivos a adjuntar
   @override
   Future<void> updateNoteWithFiles(
       Note updatedNote, List<File> newFiles) async {
@@ -347,6 +397,9 @@ class NoteRepositoryImpl implements NoteRepository {
     print('✅ Archivos procesados: ${uploadedFiles.length}');
   }
 
+  /// Descarga una nota específica del servidor
+  ///
+  /// [noteId] - ID de la nota a descargar
   @override
   Future<void> downloadNote(String noteId) async {
     final db = await _db;
@@ -380,6 +433,9 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Elimina una nota y sus archivos adjuntos
+  ///
+  /// [noteId] - ID de la nota a eliminar
   @override
   Future<void> deleteNote(String noteId) async {
     final db = await _db;
@@ -394,6 +450,11 @@ class NoteRepositoryImpl implements NoteRepository {
     }
   }
 
+  /// Obtiene una lista de notas según los criterios especificados
+  ///
+  /// [onlyPublic] - Si es true, solo retorna notas públicas
+  /// [userId] - Si se especifica, solo retorna notas de ese usuario
+  /// Retorna una lista de notas que cumplen con los criterios
   @override
   Future<List<Note>> getNotes({bool onlyPublic = false, String? userId}) async {
     print(
@@ -460,6 +521,10 @@ class NoteRepositoryImpl implements NoteRepository {
     return localNotes;
   }
 
+  /// Busca notas que coincidan con el texto de búsqueda
+  ///
+  /// [query] - Texto a buscar en título y contenido
+  /// Retorna una lista de notas que coinciden con la búsqueda
   @override
   Future<List<Note>> searchNotes(String query) async {
     final db = await _db;
@@ -493,6 +558,9 @@ class NoteRepositoryImpl implements NoteRepository {
     return localNotes;
   }
 
+  /// Guarda una nota en el caché local
+  ///
+  /// [note] - Nota a guardar en caché
   @override
   Future<void> cacheNote(Note note) async {
     final db = await _db;
@@ -503,6 +571,8 @@ class NoteRepositoryImpl implements NoteRepository {
     );
   }
 
+  /// Sincroniza las notas locales con el servidor
+  /// Solo se ejecuta si hay conexión a internet
   @override
   Future<void> syncNotes() async {
     if (!await _isOnline()) {
@@ -523,6 +593,10 @@ class NoteRepositoryImpl implements NoteRepository {
     print('🧹 Base de datos local (notes) limpiada tras sincronización');
   }
 
+  /// Obtiene el autor de una nota específica
+  ///
+  /// [noteId] - ID de la nota
+  /// Retorna el usuario autor de la nota
   @override
   Future<User> getNoteAuthor(String noteId) async {
     final db = await _db;
@@ -545,6 +619,11 @@ class NoteRepositoryImpl implements NoteRepository {
     return user;
   }
 
+  /// Verifica si un usuario es el autor de una nota
+  ///
+  /// [noteId] - ID de la nota
+  /// [userId] - ID del usuario a verificar
+  /// Retorna true si el usuario es el autor, false en caso contrario
   @override
   Future<bool> verifyNoteAuthor(String noteId, String userId) async {
     final db = await _db;

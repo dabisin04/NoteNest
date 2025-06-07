@@ -1,6 +1,6 @@
 # NoteNest 📝
 
-NoteNest es una aplicación de notas con sincronización offline que permite a los usuarios crear, compartir y gestionar notas con archivos adjuntos. La aplicación utiliza una arquitectura híbrida con almacenamiento local y sincronización en la nube, permitiendo su uso sin conexión.
+NoteNest es una aplicación de notas con sincronización offline que permite a los usuarios crear, compartir y gestionar notas con archivos adjuntos. La aplicación utiliza una arquitectura híbrida con almacenamiento local y sincronización en la nube, permitiendo su uso sin conexión. 
 
 ## Arquitectura
 
